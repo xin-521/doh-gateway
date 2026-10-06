@@ -37,6 +37,8 @@ const env = {
   DOH_STRATEGY: process.env.DOH_STRATEGY || 'hedge',
   DOH_DEBUG: '1',
 };
+// 允许通过环境变量临时覆盖上游，便于本机验证（国内直连国外 DoH 可能超时）
+if (process.env.DOH_UPSTREAMS) env.DOH_UPSTREAMS = process.env.DOH_UPSTREAMS;
 
 async function resolveWire() {
   const url = `https://gw.local/dns-query?dns=${b64url(makeQuery(NAME, TYPE === 'AAAA' ? 28 : 1))}`;

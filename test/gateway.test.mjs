@@ -286,6 +286,40 @@ test('readConfig: 非法 DOH_UPSTREAMS 回退默认值', () => {
   assert.equal(cfg.maxAttempts, 3);
 });
 
+test('readConfig: 默认上游全为国外顶级 DNS，且默认开 ECS', () => {
+  const cfg = readConfig({});
+  assert.deepEqual(cfg.providers.map((p) => p.name).sort(), [
+    'adguard',
+    'cloudflare',
+    'dns0',
+    'google',
+    'opendns',
+    'quad9',
+  ]);
+  for (const p of cfg.providers) assert.match(p.url, /^https:\/\//);
+  assert.equal(cfg.forwardEcs, true);
+});
+
+test('JSON 模式下 wire-only 上游被过滤', async () => {
+  const env = {
+    ...BASE_ENV,
+    DOH_UPSTREAMS: JSON.stringify([
+      { name: 'wireonly', url: 'https://w.example/dns-query', weight: 1e6, json: false },
+      { name: 'both', url: 'https://b2.example/dns-query', weight: 1 },
+    ]),
+  };
+  installFetch({ 'b2.example': () => jsonResponse({ Status: 0 }) });
+  const res = await gateway.fetch(
+    new Request('https://gw.example/dns-query?name=example.com&type=A', {
+      headers: { accept: 'application/dns-json' },
+    }),
+    {},
+    env,
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-doh-upstream'), 'both');
+});
+
 test('inspectWire: 直接接收 ArrayBuffer', () => {
   const ab = makeResponseWire().buffer;
   assert.equal(inspectWire(ab, { retryRcodes: [2, 5], retryTruncated: true, retryEmpty: false }), null);

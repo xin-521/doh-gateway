@@ -16,12 +16,20 @@
 
 const VERSION = '1.0.0';
 
-/** 默认上游：国内可直连 + 全球节点。weight 越大越优先。 */
+/** 默认上游：全部为国外顶级公共 DNS（无线/JSON 能力以官方文档为准）。weight 越大越优先。 */
 const DEFAULT_PROVIDERS = [
-  { name: 'alidns', url: 'https://dns.alidns.com/dns-query', jsonUrl: 'https://dns.alidns.com/resolve', weight: 3, json: true },
-  { name: 'dnspod', url: 'https://doh.pub/dns-query', weight: 3, json: true },
-  { name: 'cloudflare', url: 'https://cloudflare-dns.com/dns-query', weight: 2, json: true },
-  { name: 'google', url: 'https://dns.google/dns-query', jsonUrl: 'https://dns.google/resolve', weight: 2, json: true },
+  // Cloudflare 1.1.1.1：wire + JSON 同一端点
+  { name: 'cloudflare', url: 'https://cloudflare-dns.com/dns-query', weight: 4, json: true },
+  // Google Public DNS：wire 与 JSON 不同端点
+  { name: 'google', url: 'https://dns.google/dns-query', jsonUrl: 'https://dns.google/resolve', weight: 3, json: true },
+  // Quad9：重隐私/DNSSEC，JSON 服务已退役，仅 wire
+  { name: 'quad9', url: 'https://dns.quad9.net/dns-query', weight: 3, json: false },
+  // Cisco OpenDNS：仅 wire，不支持 JSON
+  { name: 'opendns', url: 'https://doh.opendns.com/dns-query', weight: 2, json: false },
+  // AdGuard DNS：支持 JSON
+  { name: 'adguard', url: 'https://dns.adguard-dns.com/dns-query', weight: 2, json: true },
+  // dns0.eu（欧盟非营利，无日志）：仅 wire
+  { name: 'dns0', url: 'https://dns0.eu/', weight: 1, json: false },
 ];
 
 const RCODE_SERVFAIL = 2;
@@ -119,7 +127,7 @@ function readConfig(env) {
     cooldown: toInt(e.DOH_COOLDOWN_MS, 30000, 0, 600000),
     cacheTtl: toInt(e.DOH_CACHE_TTL, 30, 0, 86400),
     cors: toBool(e.DOH_CORS, true),
-    forwardEcs: toBool(e.DOH_FORWARD_ECS, false),
+    forwardEcs: toBool(e.DOH_FORWARD_ECS, true),
     retryRcodes: parseRcodes(e.DOH_RETRY_RCODES, [RCODE_SERVFAIL, RCODE_REFUSED]),
     retryTruncated: toBool(e.DOH_RETRY_TRUNCATED, true),
     retryEmpty: toBool(e.DOH_RETRY_EMPTY, false),
@@ -248,8 +256,8 @@ async function parseClientRequest(request, cfg) {
     ctx.body = buf;
   }
 
-  // EDNS Client Subnet 透传（仅当客户端没有自带时）
-  if (cfg.forwardEcs && !params.has('edns_client_subnet') && !isJson) {
+  // EDNS Client Subnet 透传（仅当客户端没有自带时；JSON 与 wire 都带，上游不支持会忽略）
+  if (cfg.forwardEcs && !params.has('edns_client_subnet')) {
     const fwd = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '';
     const ip = fwd.split(',')[0].trim();
     if (ip && /^[0-9a-fA-F:.]+$/.test(ip)) ctx.ecs = ip;

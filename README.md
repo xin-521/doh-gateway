@@ -76,6 +76,8 @@ npx esa-cli domain add dns.example.com
 npx esa-cli route add --pattern "/dns-query"
 ```
 
+> `jsonUrl`：JSON DoH 与 wire DoH 不同端点时使用（如 Google）。设置 `"json": false` 可让某上游只处理 wire 请求（Quad9/OpenDNS/dns0.eu 默认即 wire-only）。
+>
 > 若在本地直接使用 `esa-cli`，也可全局安装：`npm i -g esa-cli`。CI 场景建议固定为项目依赖。
 
 ## 环境变量（在控制台「函数变量 / ESA CLI env」中配置）
@@ -93,22 +95,30 @@ npx esa-cli route add --pattern "/dns-query"
 | `DOH_RETRY_RCODES` | `2,5` | 触发切换的 DNS rcode（SERVFAIL/REFUSED） |
 | `DOH_RETRY_TRUNCATED` | `true` | 截断响应是否切换 |
 | `DOH_RETRY_EMPTY` | `false` | 空答案是否切换 |
-| `DOH_FORWARD_ECS` | `false` | 透传客户端 IP 作为 EDNS Client Subnet |
+| `DOH_FORWARD_ECS` | `true` | 透传客户端 IP 作为 EDNS Client Subnet（利于就近解析） |
 | `DOH_CORS` | `true` | 是否加 CORS 头 |
 | `DOH_DEBUG` | `false` | 调试开关 |
 
-`DOH_UPSTREAMS` 示例（也可整段不配，使用内置默认上游）：
+`DOH_UPSTREAMS` 不配置时使用内置默认上游；默认上游全部为国外顶级公共 DNS：
+
+| 名称 | 端点 | JSON | 权重 |
+| --- | --- | --- | --- |
+| cloudflare | `https://cloudflare-dns.com/dns-query` | ✅ 同端点 | 4 |
+| google | `https://dns.google/dns-query`（JSON：`https://dns.google/resolve`） | ✅ | 3 |
+| quad9 | `https://dns.quad9.net/dns-query` | ❌ 仅 wire | 3 |
+| opendns | `https://doh.opendns.com/dns-query` | ❌ 仅 wire | 2 |
+| adguard | `https://dns.adguard-dns.com/dns-query` | ✅ | 2 |
+| dns0.eu | `https://dns0.eu/` | ❌ 仅 wire | 1 |
+
+自定义示例：
 
 ```json
 [
-  { "name": "alidns",  "url": "https://dns.alidns.com/dns-query",  "jsonUrl": "https://dns.alidns.com/resolve", "weight": 5 },
-  { "name": "dnspod",  "url": "https://doh.pub/dns-query",         "weight": 3 },
-  { "name": "cloudflare", "url": "https://cloudflare-dns.com/dns-query", "weight": 2 },
-  { "name": "google",  "url": "https://dns.google/dns-query",      "jsonUrl": "https://dns.google/resolve", "weight": 2 }
+  { "name": "cloudflare", "url": "https://cloudflare-dns.com/dns-query", "weight": 5 },
+  { "name": "quad9",      "url": "https://dns.quad9.net/dns-query", "weight": 3 },
+  { "name": "mydns",      "url": "https://dns.example.com/dns-query", "weight": 1 }
 ]
 ```
-
-> `jsonUrl`：JSON DoH 与 wire DoH 不同端点时使用（如阿里云、Google）。设置 `"json": false` 可让某上游只处理 wire 请求。
 
 ## 客户端接入
 
@@ -134,7 +144,7 @@ curl --doh-url https://dns.example.com/dns-query https://www.taobao.com
 # 单元/集成测试（mock 上游，无需联网）：16 个用例，覆盖转发/故障切换/对冲/校验/CORS
 npm test
 
-# 真实网络冒烟（需能访问外网，可用 HTTP(S)_PROXY）
+# 真实网络冒烟（需能访问国外 DoH；国内本机直连可能超时，ESA 边缘节点可正常访问）
 npm run live-check -- www.taobao.com A
 ```
 
@@ -151,4 +161,4 @@ npm run live-check -- www.taobao.com A
 ## 已验证
 
 - `node --test test/gateway.test.mjs` → **16/16 通过**
-- `node scripts/live-check.mjs www.taobao.com A` → wire/json 均 200，返回真实 A 记录（本例自动从 alidns 故障切换到 dnspod）
+- `node scripts/live-check.mjs www.taobao.com A` → 能连通时返回真实 A 记录；国内本机直连国外 DoH 可能超时，ESA 节点访问正常
