@@ -110,7 +110,7 @@ function readConfig(env) {
     providers: parseProviders(e.DOH_UPSTREAMS),
     strategy: String(e.DOH_STRATEGY || 'hedge').toLowerCase(),
     maxAttempts,
-    // 单个上游超时：必须明显小于 hedgeDelay 才能发挥对冲效果
+    // 单个上游超时；对冲延迟(hedgeDelay)应明显小于它，才能提前并发下一个上游
     attemptTimeout: toInt(e.DOH_ATTEMPT_TIMEOUT_MS, 1200, 100, 8000),
     // 对冲延迟：主上游无响应时，提前并发下一个上游
     hedgeDelay: toInt(e.DOH_HEDGE_DELAY_MS, 300, 0, 5000),
