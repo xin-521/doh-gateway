@@ -1,0 +1,22 @@
+{
+  "name": "doh-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aliyun ESA edge function: DNS-over-HTTPS gateway with multi-upstream load balancing",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/gateway.test.mjs",
+    "live-check": "node scripts/live-check.mjs",
+    "dev": "esa-cli dev",
+    "commit": "esa-cli commit",
+    "deploy": "esa-cli deploy",
+    "env:list": "esa-cli env list --environment production"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "esa-cli": "^1.0.13"
+  }
+}

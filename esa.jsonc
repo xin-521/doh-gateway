@@ -1,0 +1,9 @@
+{
+  // ESA CLI / 控制台项目配置：仅声明函数入口，无静态资源
+  "name": "doh-gateway",
+  "description": "DoH 多上游负载均衡网关（RFC 8484）",
+  "entry": "./src/index.js",
+  "dev": {
+    "port": 18080
+  }
+}

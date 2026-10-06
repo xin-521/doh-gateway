@@ -1,0 +1,11 @@
+node_modules/
+.esa/
+.env
+.env.*
+*.log
+
+# 工作日志（按需保留为非跟踪文件）
+WORKLOG.md
+
+# 临时验证产物
+temp/
