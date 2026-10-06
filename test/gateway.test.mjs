@@ -208,10 +208,24 @@ test('OPTIONS 预检返回 204 + CORS', async () => {
   assert.equal(res.headers.get('access-control-allow-origin'), '*');
 });
 
-test('缺少 ?dns= 返回 400', async () => {
+test('无参数存活探测返回 200 元信息', async () => {
   installFetch({});
   const res = await gateway.fetch(new Request('https://gw.example/dns-query'), {}, BASE_ENV);
-  assert.equal(res.status, 400);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.status, 200);
+});
+
+test('HEAD 查询复用 GET 且无响应体', async () => {
+  installFetch({ 'a.example': () => wireResponse(makeResponseWire()) });
+  const res = await gateway.fetch(
+    new Request('https://gw.example/dns-query?dns=' + b64url(makeQueryWire()), { method: 'HEAD' }),
+    {},
+    BASE_ENV,
+  );
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('x-doh-upstream'), 'a');
+  assert.equal(await res.text(), '');
 });
 
 test('非法 base64url 返回 400', async () => {

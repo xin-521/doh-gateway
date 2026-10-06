@@ -207,17 +207,20 @@ function base64UrlEncode(bytes) {
  * 返回 { error } 或 { method, isJson, dns, params, body, accept, ecs }
  */
 async function parseClientRequest(request, cfg) {
-  const method = request.method.toUpperCase();
-  if (method !== 'GET' && method !== 'POST') {
+  const rawMethod = request.method.toUpperCase();
+  if (rawMethod !== 'GET' && rawMethod !== 'POST' && rawMethod !== 'HEAD') {
     return { error: { status: 405, message: 'Method Not Allowed' } };
   }
+  // HEAD 复用 GET 的解析逻辑（多数客户端用它做存活探测）
+  const method = rawMethod === 'HEAD' ? 'GET' : rawMethod;
 
   const url = new URL(request.url);
   const params = url.searchParams;
   const accept = request.headers.get('accept') || '';
 
   const hasDns = params.has('dns');
-  const isJson = accept.includes('application/dns-json') || (!hasDns && params.has('name'));
+  const hasName = params.has('name');
+  const isJson = accept.includes('application/dns-json') || (!hasDns && hasName);
 
   const ctx = {
     method,
@@ -228,10 +231,14 @@ async function parseClientRequest(request, cfg) {
     body: null,
     ecs: '',
     clientId: '',
+    meta: false,
   };
 
-  if (isJson) {
-    if (!params.has('name')) {
+  if (method === 'GET' && !hasDns && !hasName) {
+    // 无查询参数的 GET/HEAD：视为存活探测，返回服务元信息而不是 400，方便客户端校验
+    ctx.meta = true;
+  } else if (isJson) {
+    if (!hasName) {
       return { error: { status: 400, message: 'missing ?name= (JSON DoH)' } };
     }
   } else if (method === 'GET') {
@@ -459,7 +466,7 @@ function errorResponse(cfg, request, status, message) {
 // ---------------------------------------------------------------------------
 // 入口
 // ---------------------------------------------------------------------------
-async function handleRequest(request, env) {
+async function handleRequestInner(request, env) {
   const cfg = readConfig(env);
 
   if (request.method.toUpperCase() === 'OPTIONS') {
@@ -469,6 +476,15 @@ async function handleRequest(request, env) {
   const parsed = await parseClientRequest(request, cfg);
   if (parsed.error) return errorResponse(cfg, request, parsed.error.status, parsed.error.message);
   const ctx = parsed.ctx;
+
+  // 无查询参数的存活探测：返回 200 元信息，方便客户端校验服务器可用性
+  if (ctx.meta) {
+    const headers = new Headers({ 'content-type': 'application/json; charset=utf-8' });
+    if (cfg.cors) withCors(headers, request);
+    headers.set('x-doh-version', VERSION);
+    const body = JSON.stringify({ status: 200, service: 'doh-gateway', version: VERSION });
+    return new Response(body, { status: 200, headers });
+  }
 
   // 按客户端所需格式筛选可用上游
   let pool = cfg.providers.filter((p) => (ctx.isJson ? p.json !== false : p.wire !== false));
@@ -522,6 +538,16 @@ async function handleRequest(request, env) {
   }
 
   return out;
+}
+
+/**
+ * 入口包装：HEAD 复用 handleRequestInner，但按 HEAD 语义去掉响应体。
+ */
+async function handleRequest(request, env) {
+  const isHead = request.method.toUpperCase() === 'HEAD';
+  const res = await handleRequestInner(request, env);
+  if (!isHead) return res;
+  return new Response(null, { status: res.status, headers: res.headers });
 }
 
 export default {

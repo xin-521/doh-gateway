@@ -138,10 +138,12 @@ curl --doh-url https://dns.example.com/dns-query https://www.taobao.com
 
 `dig`（需 doh 工具如 `dog` / `q`）：`dog www.taobao.com @https://dns.example.com/dns-query`
 
+存活探测：不带查询参数的 `GET`/`HEAD` 会返回 `200` + `{"status":200,...}`（而不是 400），方便客户端在填写服务器地址时做可用性校验；`OPTIONS` 返回 204。带 `?dns=`/`?name=` 时才是真正的解析请求。
+
 ## 本地验证
 
 ```bash
-# 单元/集成测试（mock 上游，无需联网）：16 个用例，覆盖转发/故障切换/对冲/校验/CORS
+# 单元/集成测试（mock 上游，无需联网）：19 个用例，覆盖转发/故障切换/对冲/校验/HEAD 探测/CORS
 npm test
 
 # 真实网络冒烟（需能访问国外 DoH；国内本机直连可能超时，ESA 边缘节点可正常访问）
