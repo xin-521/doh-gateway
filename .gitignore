@@ -1,5 +1,6 @@
 node_modules/
 .esa/
+.dev/
 .env
 .env.*
 *.log
