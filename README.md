@@ -125,7 +125,7 @@ npx esa-cli route add --pattern "/dns-query"
 ```bash
 # wire 格式（RFC 8484）
 curl -s -o /dev/null -w '%{http_code}\n' \
-  'https://dns.example.com/dns-query?dns=AAABAAABAAAAAAAAA3d3dwd0YW9iYW9jbgAAAQAB' \
+  'https://dns.example.com/dns-query?dns=AAABAAABAAAAAAAAA3d3dwZ0YW9iYW8DY29tAAABAAE' \
   -H 'accept: application/dns-message'
 
 # JSON 格式
