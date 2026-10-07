@@ -201,6 +201,44 @@ test('JSON DoH (?name=) 透传并保留 json content-type', async () => {
   assert.equal(data.Answer[0].data, '1.2.3.4');
 });
 
+test('JSON DoH 归一化 type 尾部引号（type=A%27）与 name 引号', async () => {
+  const seen = [];
+  installFetch({
+    'a.example': (u) => {
+      seen.push({ name: u.searchParams.get('name'), type: u.searchParams.get('type') });
+      return jsonResponse({ Status: 0, Answer: [{ name: 'www.google.com', type: 1, data: '1.2.3.4' }] });
+    },
+  });
+  const res = await gateway.fetch(
+    new Request("https://gw.example/dns-query?name='www.google.com'&type=A%27", {
+      headers: { accept: 'application/dns-json' },
+    }),
+    {},
+    BASE_ENV,
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual(seen[0], { name: 'www.google.com', type: 'A' });
+});
+
+test('JSON DoH 缺省 type 时补 A', async () => {
+  const seen = [];
+  installFetch({
+    'a.example': (u) => {
+      seen.push(u.searchParams.get('type'));
+      return jsonResponse({ Status: 0, Answer: [] });
+    },
+  });
+  const res = await gateway.fetch(
+    new Request('https://gw.example/dns-query?name=example.com', {
+      headers: { accept: 'application/dns-json' },
+    }),
+    {},
+    BASE_ENV,
+  );
+  assert.equal(res.status, 200);
+  assert.equal(seen[0], 'A');
+});
+
 test('OPTIONS 预检返回 204 + CORS', async () => {
   installFetch({});
   const res = await gateway.fetch(new Request('https://gw.example/dns-query', { method: 'OPTIONS' }), {}, BASE_ENV);

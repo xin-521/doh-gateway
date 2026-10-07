@@ -203,6 +203,28 @@ function base64UrlEncode(bytes) {
 }
 
 /**
+ * 归一化 JSON DoH 查询参数，容忍客户端拼接噪音（首尾引号、空格、%27 等）。
+ * 例如 ?type=A' / ?name=%27www.google.com%27 在上游会被判 400，这里清洗后再转发。
+ */
+function normalizeJsonParams(params) {
+  const out = [];
+  for (const [key, value] of params) {
+    let v = value;
+    if (key === 'name') {
+      v = value.trim().replace(/^['"]+|['"]+$/g, '');
+      if (!v) continue;
+    } else if (key === 'type') {
+      const cleaned = value.trim().replace(/^['"]+|['"]+$/g, '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+      v = cleaned || 'A';
+    }
+    out.push([key, v]);
+  }
+  // JSON DoH 规范中 type 缺省为 A
+  if (!out.some(([k]) => k === 'type')) out.push(['type', 'A']);
+  return out;
+}
+
+/**
  * 将客户端请求归一化为内部上下文。
  * 返回 { error } 或 { method, isJson, dns, params, body, accept, ecs }
  */
@@ -228,11 +250,13 @@ async function parseClientRequest(request, cfg) {
     accept,
     params,
     dns: params.get('dns') || '',
+    jsonParams: null,
     body: null,
     ecs: '',
     clientId: '',
     meta: false,
   };
+  if (isJson) ctx.jsonParams = normalizeJsonParams(params);
 
   if (method === 'GET' && !hasDns && !hasName) {
     // 无查询参数的 GET/HEAD：视为存活探测，返回服务元信息而不是 400，方便客户端校验
@@ -285,7 +309,7 @@ function buildUpstreamUrl(provider, ctx) {
   const qs = u.searchParams;
   if (ctx.method === 'GET') {
     if (ctx.isJson) {
-      for (const [k, v] of ctx.params) qs.set(k, v);
+      for (const [k, v] of (ctx.jsonParams || ctx.params)) qs.set(k, v);
     } else {
       qs.set('dns', ctx.dns);
     }
