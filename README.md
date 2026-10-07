@@ -2,9 +2,6 @@
 
 在**阿里云 ESA 边缘节点**上运行的 DNS-over-HTTPS（DoH, RFC 8484）转发网关。一个函数内可配置**多个 DoH 上游**，通过**加权轮询 / 随机 / 对冲（Hedging）竞速**做负载均衡与故障切换，从而在最近的边缘节点用最快的上游解析出 IP。
 
-> 灵感来源：阿里云 ESA「函数和 Pages」提供 V8 Isolate 边缘 JS 运行时。
-> <https://help.aliyun.com/zh/edge-security-acceleration/esa/user-guide/what-is-functions-and-pages/>
-
 ## 它做什么
 
 ```
@@ -155,7 +152,7 @@ npm run live-check -- www.taobao.com A
 ## 安全与注意
 
 - 上游仅允许 `https://`，避免明文 DNS 回源。
-- 本函数默认对所有来源开放（公共解析服务）。如需限制，可在 ESA 侧用 WAF / 访问控制，或在函数里校验来源。
+- 本函数默认对所有来源开放。如需限制，可在 ESA 侧用 WAF / 访问控制，或在函数里校验来源。
 - 缓存按「URL + 格式」缓存，DNS 报文内含事务 ID，因此只对相同查询字符串有效；如需按域名聚合缓存，可再演进为按 name/type 归一化。
 - 若发现上游频繁打满，调大 `DOH_HEDGE_DELAY_MS` 或调小 `DOH_MAX_ATTEMPTS`（对冲会成倍消耗子请求）。
 - 切勿把 AK/SK 写进代码，用 ESA 函数变量/密钥。
@@ -163,4 +160,3 @@ npm run live-check -- www.taobao.com A
 ## 已验证
 
 - `node --test test/gateway.test.mjs` → **16/16 通过**
-- `node scripts/live-check.mjs www.taobao.com A` → 能连通时返回真实 A 记录；国内本机直连国外 DoH 可能超时，ESA 节点访问正常

@@ -4,6 +4,7 @@ node_modules/
 .env
 .env.*
 *.log
+.codeartsdoer
 
 # 工作日志（按需保留为非跟踪文件）
 WORKLOG.md
